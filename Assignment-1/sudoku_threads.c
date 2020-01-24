@@ -32,6 +32,11 @@
 #include <getopt.h>
 #include "common.h"
 
+FILE *inputfile;
+FILE *outputfile;
+pthread_mutex_t input_lock;
+pthread_mutex_t output_lock;
+
 /* Check the common header for the definition of puzzle */
 
 /* Check if current number is valid in this position;
@@ -42,12 +47,9 @@ int solve(puzzle *p, int row, int column);
 
 void write_to_file(puzzle *p, FILE *outputfile);
 
-int main(int argc, char **argv) {
-    FILE *inputfile;
-    FILE *outputfile;
-    puzzle *p;
-    int current_puzzle = 0;
+void *sudoku_runner();
 
+int main(int argc, char **argv) {
     /* Parse arguments */
     int c;
     int num_threads = 1;
@@ -81,21 +83,41 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    /* Main loop - solve puzzle, write to file.
-     * The read_next_puzzle function is defined in the common header */
-    while ((p = read_next_puzzle(inputfile)) != NULL) {
-        current_puzzle++;
-        if (solve(p, 0, 0)) {
-            write_to_file(p, outputfile);
-        } else {
-            printf("Illegal sudoku (number %d in the file) (or a broken algorithm)\n", current_puzzle);
-        }
-        free(p);
+    pthread_t tid[num_threads];
+
+    for (int i = 0; i < num_threads; i++) {
+        pthread_create(&tid[i], NULL, sudoku_runner, NULL);
     }
+
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(tid[i], NULL);
+    }
+
+    pthread_exit(0);
 
     fclose( inputfile );
     fclose( outputfile );
     return 0;
+}
+
+void *sudoku_runner() {
+    puzzle *p;
+
+    while (1) {
+        pthread_mutex_lock(&input_lock);
+        p = read_next_puzzle(inputfile);
+        pthread_mutex_unlock(&input_lock);
+
+        if (p != NULL) {
+            if (solve(p, 0, 0)) {
+                pthread_mutex_lock(&output_lock);
+                write_to_file(p, outputfile);
+                pthread_mutex_unlock(&output_lock);
+            } 
+        } else {
+            break;
+        }
+    }
 }
 
 /*
