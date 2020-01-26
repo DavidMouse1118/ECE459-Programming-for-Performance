@@ -93,8 +93,6 @@ int main(int argc, char **argv) {
         pthread_join(tid[i], NULL);
     }
 
-    pthread_exit(0);
-
     fclose( inputfile );
     fclose( outputfile );
     return 0;
@@ -113,7 +111,8 @@ void *sudoku_runner() {
                 pthread_mutex_lock(&output_lock);
                 write_to_file(p, outputfile);
                 pthread_mutex_unlock(&output_lock);
-            } 
+            }
+            free(p);
         } else {
             break;
         }

@@ -32,6 +32,28 @@
 #include <getopt.h>
 #include "common.h"
 
+
+struct thread_args {
+    int row;
+    int col;
+    puzzle *p;
+};
+
+int row_1 = 0;
+int col_1 = 0;
+int row_2 = 0;
+int col_2 = 1;
+
+puzzle *solution_p;
+
+int MAX_JOBS = 81;
+int num_threads = 1;
+int active_threads = 0;
+int current_job = 0;
+
+pthread_mutex_t active_threads_lock;
+pthread_cond_t cond;
+
 /* Check the common header for the definition of puzzle */
 
 /* Check if current number is valid in this position;
@@ -42,6 +64,12 @@ int solve(puzzle *p, int row, int column);
 
 void write_to_file(puzzle *p, FILE *outputfile);
 
+void *solve_thread(void *argp);
+
+void find_first_two_empty_space(puzzle *p);
+
+void solve_multi_thread(puzzle *p);
+
 int main(int argc, char **argv) {
     FILE *inputfile;
     FILE *outputfile;
@@ -50,7 +78,6 @@ int main(int argc, char **argv) {
 
     /* Parse arguments */
     int c;
-    int num_threads = 1;
     char *filename = NULL;
     while ((c = getopt(argc, argv, "t:i:")) != -1) {
         switch (c) {
@@ -85,17 +112,127 @@ int main(int argc, char **argv) {
      * The read_next_puzzle function is defined in the common header */
     while ((p = read_next_puzzle(inputfile)) != NULL) {
         current_puzzle++;
-        if (solve(p, 0, 0)) {
-            write_to_file(p, outputfile);
-        } else {
-            printf("Illegal sudoku (number %d in the file) (or a broken algorithm)\n", current_puzzle);
-        }
+
+        solve_multi_thread(p);
+
+        write_to_file(solution_p, outputfile);
+
         free(p);
+        free(solution_p);
     }
 
     fclose( inputfile );
     fclose( outputfile );
     return 0;
+}
+
+void solve_multi_thread(puzzle *p) {
+    pthread_t tid[MAX_JOBS];
+
+    // Find the first two empty space
+    find_first_two_empty_space(p);
+
+
+    for (int nextNumber_1 = 1; nextNumber_1 < 10; nextNumber_1++) {
+        for (int nextNumber_2 = 1; nextNumber_2 < 10; nextNumber_2++) {
+            if (is_valid(nextNumber_1, p, row_1, col_1) == 0) {
+                continue;
+            }
+            
+            p->content[row_1][col_1] = nextNumber_1;
+
+            if (is_valid(nextNumber_2, p, row_2, col_2) == 0) {
+                p->content[row_1][col_1] = 0;
+                continue;
+            }
+
+            p->content[row_2][col_2] = nextNumber_2;
+
+            puzzle *copied_p = malloc(sizeof(puzzle));
+            memcpy(copied_p, p, sizeof(puzzle));
+
+            struct thread_args *args = malloc(sizeof *args);
+
+            /* Block on condition variable until there are insufficient workers running */
+            pthread_mutex_lock(&active_threads_lock);
+            while (active_threads >= num_threads) {
+                pthread_cond_wait(&cond, &active_threads_lock);
+            }
+
+            active_threads ++;
+            pthread_mutex_unlock(&active_threads_lock);
+
+            args->row = row_2;
+            args->col = col_2;
+            args->p = copied_p;
+
+            pthread_create(&tid[current_job], NULL, solve_thread, args);
+            current_job ++;
+            
+            p->content[row_1][col_1] = 0;
+            p->content[row_2][col_2] = 0;
+        }
+    }
+
+    for (int i = 0; i < current_job; i++) {
+        pthread_join(tid[i], NULL);
+    }
+
+    active_threads = 0;
+    current_job = 0;
+}
+
+void *solve_thread(void *argp) {
+    struct thread_args *args = argp;
+
+    int row = args->row;
+    int col = args->col;
+    puzzle *p = args->p;
+
+    free(args);
+
+    if (col == 8) {
+        if (solve(p, row + 1, 0)) {
+            solution_p = p;
+        } else {
+            free(p);
+        }
+    } else {
+        if (solve(p, row, col + 1)) {
+            solution_p = p;
+        } else {
+            free(p);
+        }
+    }
+
+    pthread_mutex_lock(&active_threads_lock);
+    /* Worker is about to exit, so decrement count and wakeup main thread */
+    active_threads --;
+    pthread_cond_signal(&cond);
+    pthread_mutex_unlock(&active_threads_lock);
+}
+
+void find_first_two_empty_space(puzzle *p) {
+    int empty_count = 0;
+    for (int row = 0; row < 9; row ++) {
+        for (int col = 0; col < 9; col ++) {
+            if (p->content[row][col]) {
+                continue;
+            }
+
+            if (empty_count == 0) {
+                row_1 = row;
+                col_1 = col;
+                empty_count ++;
+            } else if (empty_count == 1) {
+                row_2 = row;
+                col_2 = col;
+                empty_count ++;
+            } else {
+                return;
+            }
+        }
+    }
 }
 
 /*

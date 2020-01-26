@@ -174,6 +174,8 @@ void *input_reader() {
 
         // Write the unsolved puzzel into the input fd
         write(input_fd[1], p, sizeof(*p));
+
+        free(p);
     }
 }
 
@@ -207,6 +209,8 @@ void *puzzle_solver() {
             write(output_fd[1], p, sizeof(*p));
         }
     }
+
+    free(p);
 }
 
 void *output_writer() {
@@ -227,6 +231,8 @@ void *output_writer() {
         write_to_file(p, outputfile);
         pthread_mutex_unlock(&output_file_lock);
     }
+    
+    free(p);
 }
 
 /*
