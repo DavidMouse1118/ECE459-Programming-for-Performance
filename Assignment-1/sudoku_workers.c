@@ -32,6 +32,28 @@
 #include <getopt.h>
 #include "common.h"
 
+FILE *inputfile;
+FILE *outputfile;
+
+int input_fd[2];
+int output_fd[2];
+
+pthread_mutex_t input_file_lock;
+pthread_mutex_t output_file_lock;
+
+int num_threads = 1;
+
+int current_puzzle = 0;
+
+int input_reader_thread_counter = 0;
+int puzzle_solver_thread_counter = 0;
+
+int input_reader_counter = 0;
+int puzzle_solver_counter = 0;
+
+pthread_mutex_t input_reader_counter_lock;
+pthread_mutex_t puzzle_solver_counter_lock;
+
 /* Check the common header for the definition of puzzle */
 
 /* Check if current number is valid in this position;
@@ -42,15 +64,17 @@ int solve(puzzle *p, int row, int column);
 
 void write_to_file(puzzle *p, FILE *outputfile);
 
+void *input_reader();
+
+void *puzzle_solver();
+
+void *output_writer();
+
 int main(int argc, char **argv) {
-    FILE *inputfile;
-    FILE *outputfile;
     puzzle *p;
-    int current_puzzle = 0;
 
     /* Parse arguments */
     int c;
-    int num_threads = 1;
     char *filename = NULL;
     while ((c = getopt(argc, argv, "t:i:")) != -1) {
         switch (c) {
@@ -81,21 +105,128 @@ int main(int argc, char **argv) {
         return EXIT_FAILURE;
     }
 
-    /* Main loop - solve puzzle, write to file.
-     * The read_next_puzzle function is defined in the common header */
-    while ((p = read_next_puzzle(inputfile)) != NULL) {
-        current_puzzle++;
-        if (solve(p, 0, 0)) {
-            write_to_file(p, outputfile);
-        } else {
-            printf("Illegal sudoku (number %d in the file) (or a broken algorithm)\n", current_puzzle);
+    pthread_t tid[num_threads];
+    int i;
+    int result;
+
+    result = pipe(input_fd);
+
+    if (result < 0){
+        perror("pipe ");
+        exit(1);
+    }
+
+    result = pipe(output_fd);
+
+    if (result < 0){
+        perror("pipe ");
+        exit(1);
+    }
+
+    for (i = 0; i < num_threads; i++) {
+        if (i % 3 == 0) {
+            input_reader_thread_counter ++;
+            pthread_create(&tid[i], NULL, input_reader, NULL);
         }
-        free(p);
+        if (i % 3 == 1) {
+            puzzle_solver_thread_counter ++;
+            pthread_create(&tid[i], NULL, puzzle_solver, NULL);
+        }
+        if (i % 3 == 2) {
+            pthread_create(&tid[i], NULL, output_writer, NULL);
+        }
+    }
+
+    for (int i = 0; i < num_threads; i++) {
+        pthread_join(tid[i], NULL);
     }
 
     fclose( inputfile );
     fclose( outputfile );
     return 0;
+}
+
+void *input_reader() {
+    puzzle *p;
+    int result;
+
+    while (1) {
+        // Read the puzzel from file
+        pthread_mutex_lock(&input_file_lock);
+        p = read_next_puzzle(inputfile);
+        pthread_mutex_unlock(&input_file_lock);
+
+        // Break the while loop when finish reading from file
+        // Close the input_fd when all input_reader threads are done
+        if (p == NULL) {
+            pthread_mutex_lock(&input_reader_counter_lock);
+
+            if (input_reader_counter == input_reader_thread_counter - 1) {
+                close(input_fd[1]); // close the pipe after finishing write
+            } else {
+                input_reader_counter ++;
+            }
+
+            pthread_mutex_unlock(&input_reader_counter_lock);
+
+            break;
+        }
+
+        // Write the unsolved puzzel into the input fd
+        write(input_fd[1], p, sizeof(*p));
+    }
+}
+
+void *puzzle_solver() {
+    puzzle *p = malloc(sizeof(puzzle));
+    int result;
+
+    while(1) {
+        // Read unsolved puzzel from input fd
+        result = read(input_fd[0], p, sizeof(*p));
+
+        // Break the while loop when input fd is closed
+        // Closed the output_fd when all puzzle_solver are done
+        if (result != sizeof(*p)) {
+            pthread_mutex_lock(&puzzle_solver_counter_lock);
+
+            if (puzzle_solver_counter == puzzle_solver_thread_counter - 1) {
+                close(output_fd[1]); // close the pipe after finishing write
+            } else {
+                puzzle_solver_counter ++;
+            }
+
+            pthread_mutex_unlock(&puzzle_solver_counter_lock);
+
+            break;
+        }
+
+        // Solve the puzzel
+        if (solve(p, 0, 0)) {
+            // Write solved puzzel into the output fd
+            write(output_fd[1], p, sizeof(*p));
+        }
+    }
+}
+
+void *output_writer() {
+    puzzle *p = malloc(sizeof(puzzle));
+    int result;
+
+    while(1) {
+        // Read the solved puzzel from the output fd
+        result = read(output_fd[0], p, sizeof(*p));
+        
+        // Break the file loop when output fd is closed
+        if (result != sizeof(*p)) {
+            break;
+        }
+
+        // Saved solved puzzel into the output file
+        pthread_mutex_lock(&output_file_lock);
+        write_to_file(p, outputfile);
+        pthread_mutex_unlock(&output_file_lock);
+    }
 }
 
 /*
