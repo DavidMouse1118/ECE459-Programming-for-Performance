@@ -123,13 +123,23 @@ int main(int argc, char **argv) {
         exit(1);
     }
 
+    // Calculate the number of input reader thread and the number of puzzle solver thread
+    if (num_threads % 3 == 0) {
+        input_reader_thread_counter = num_threads / 3;
+        puzzle_solver_thread_counter = num_threads / 3;
+    } else if (num_threads % 3 == 1) {
+        input_reader_thread_counter = num_threads / 3 + 1;
+        puzzle_solver_thread_counter = num_threads / 3;
+    } else {
+        input_reader_thread_counter = num_threads / 3 + 1;
+        puzzle_solver_thread_counter = num_threads / 3 + 1;
+    }
+
     for (i = 0; i < num_threads; i++) {
         if (i % 3 == 0) {
-            input_reader_thread_counter ++;
             pthread_create(&tid[i], NULL, input_reader, NULL);
         }
         if (i % 3 == 1) {
-            puzzle_solver_thread_counter ++;
             pthread_create(&tid[i], NULL, puzzle_solver, NULL);
         }
         if (i % 3 == 2) {
