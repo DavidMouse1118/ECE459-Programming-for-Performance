@@ -10,9 +10,14 @@
 #define URL "http://berkeley.uwaterloo.ca:4590/verify"
 #define ROW_LENGTH 20
 #define MATRIX_LENGTH 202
+#define MAX_WAIT_MSECS 30*1000 /* Wait max. 30 seconds */
 
 const char *ROW_FORMAT = "[%d,%d,%d,%d,%d,%d,%d,%d,%d]";
 const char *MATRIX_FORMAT = "{\"content\":[%s, %s, %s, %s, %s, %s, %s, %s, %s]}";
+
+int num_connections = 1;
+
+FILE *inputfile;
 
 /* Create cURL easy handle and configure it */
 CURL *create_eh(const int *result_code, const char *json_to_send, const struct curl_slist *headers);
@@ -29,36 +34,11 @@ size_t read_callback(char *buffer, size_t size, size_t nitems, void *userdata);
 /* cURL write callback */
 size_t write_callback(char *ptr, size_t size, size_t nmemb, void *userdata);
 
-int verify(puzzle *p) {
-    int *result = malloc(sizeof(int));
-    char *converted = convert_to_json(p);
-    struct curl_slist *headers = config_headers();
-    CURL *eh = create_eh(result, converted, headers);
-
-    CURLcode res = curl_easy_perform(eh);
-    if (res != CURLE_OK) {
-        printf("Error occurred in executing the cURL request: %s\n",
-               curl_easy_strerror(res));
-        exit(EXIT_FAILURE);
-    }
-    long response_code;
-    curl_easy_getinfo(eh, CURLINFO_RESPONSE_CODE, &response_code);
-    if (response_code != 200) {
-        printf("Error in HTTP request; HTTP code %lu received.\n", response_code);
-    }
-
-    curl_easy_cleanup(eh);
-    curl_slist_free_all(headers);
-    int ret = *result;
-    free(result);
-    free(converted);
-    return ret;
-}
+void multi_verify();
 
 int main(int argc, char **argv) {
     /* Parse arguments */
     int c;
-    int num_connections = 1;
     char* filename = NULL;
     while ((c = getopt(argc, argv, "t:i:")) != -1) {
         switch (c) {
@@ -78,7 +58,7 @@ int main(int argc, char **argv) {
     }
 
     /* Open file */
-    FILE *inputfile = fopen(filename, "r");
+    inputfile = fopen(filename, "r");
     if (inputfile == NULL) {
         printf("Unable to open file!\n");
         return EXIT_FAILURE;
@@ -87,19 +67,123 @@ int main(int argc, char **argv) {
     curl_global_init(CURL_GLOBAL_ALL);
 
     /* Check puzzles */
-    int verified = 0;
-    int total_puzzles = 0;
-    puzzle *p;
-    while ((p = read_next_puzzle(inputfile)) != NULL) {
-        total_puzzles++;
-        verified += verify(p);
-        free(p);
-    }
+    multi_verify();
 
-    printf("%d of %d puzzles passed verification.\n", verified, total_puzzles);
     curl_global_cleanup();
     fclose( inputfile );
     return 0;
+}
+
+void multi_verify() {
+    CURLM *cm = curl_multi_init();
+
+    char *converted;
+    struct curl_slist *headers_list[num_connections];
+
+    int total_puzzles = 0;
+    int verified = 0;
+    int still_running = 0;
+
+    CURL *eh;
+
+    int results[num_connections];
+    int idx = 0;
+
+    puzzle *p;
+
+    // Read in the puzzle one by one
+    while ((p = read_next_puzzle(inputfile)) != NULL) {
+        total_puzzles ++;
+
+        converted = convert_to_json(p);
+        headers_list[idx] = config_headers();
+
+        // Initalize the easy handle and pass in the result pointer and header pointer
+        eh = create_eh(&results[idx], converted, headers_list[idx]);
+        // Add easy handle to the multi handle
+        curl_multi_add_handle( cm, eh );
+
+        // If the number of easy handle reaches num_connections, we dispatch them all at once with curl_multi_perform
+        if (idx == num_connections - 1) {
+            curl_multi_perform(cm, &still_running);
+            do {
+                int numfds = 0;
+                int res = curl_multi_wait(cm, NULL, 0, MAX_WAIT_MSECS, &numfds);
+                if (res != CURLM_OK) {
+                    return exit(EXIT_FAILURE);
+                }
+
+                curl_multi_perform(cm, &still_running);
+            } while (still_running);
+            
+            // When still_running = 0 and all the request are finished
+            // We collect all the result from the result array
+            for (int i = 0; i < num_connections; i++) {
+                verified += results[i];
+                results[i] = 0;
+                curl_slist_free_all(headers_list[i]);
+            } 
+
+            idx = 0;
+        } else {
+            idx ++;
+        }
+
+        free(p);
+    }
+    
+    // Similary to above. Handling what left in the multi handlers
+    if (idx > 0) {
+        curl_multi_perform(cm, &still_running);
+        do {
+            int numfds = 0;
+            int res = curl_multi_wait(cm, NULL, 0, MAX_WAIT_MSECS, &numfds);
+            if (res != CURLM_OK) {
+                return exit(EXIT_FAILURE);
+            }
+
+            curl_multi_perform(cm, &still_running);
+        } while (still_running);
+        
+        for (int i = 0; i < idx; i++) {
+            verified += results[i];
+            results[i] = 0;
+            curl_slist_free_all(headers_list[i]);
+        } 
+    }
+
+    CURLMsg *msg = NULL;
+    int msgs_left = 0;
+    
+    // Check the message, return code and response code for each requests
+    while ((msg = curl_multi_info_read(cm, &msgs_left))) {
+        if (msg->msg == CURLMSG_DONE) {
+            eh = msg->easy_handle;
+
+            CURLcode res = msg->data.result;
+            if (res != CURLE_OK) {
+                printf("Error occurred in executing the cURL request: %s\n",
+                    curl_easy_strerror(res));
+                exit(EXIT_FAILURE);
+            }
+
+            long response_code;
+            curl_easy_getinfo(eh, CURLINFO_RESPONSE_CODE, &response_code);
+            if (response_code != 200) {
+                printf("Error in HTTP request; HTTP code %lu received.\n", response_code);
+            }
+
+            curl_multi_remove_handle(cm, eh);
+            curl_easy_cleanup(eh);
+        } else {
+            printf("Error after curl multi info read(), CURLMsg=%d\n", msg->msg);
+        }
+    }
+
+    // Print the final result
+    printf("%d of %d puzzles passed verification.\n", verified, total_puzzles);
+
+    curl_multi_cleanup(cm);
 }
 
 char *convert_to_json(puzzle *p) {
@@ -133,6 +217,7 @@ char *convert_to_json(puzzle *p) {
 
 size_t read_callback(char *buffer, size_t size, size_t nitems, void *userdata) {
     memcpy(buffer, userdata, MATRIX_LENGTH);
+    free(userdata);
     return MATRIX_LENGTH;
 }
 
