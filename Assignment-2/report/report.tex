@@ -1,0 +1,142 @@
+\documentclass[12pt]{article}
+
+\usepackage[letterpaper, hmargin=0.75in, vmargin=0.75in]{geometry}
+\usepackage{float}
+
+\pagestyle{empty}
+
+\title{ECE 459: Programming for Performance\\Assignment 2}
+\author{Your Name}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+{\bf I verify I ran all benchmarks on a REPLACEWITHCPU with at least 4 physical cores and
+{\tt OMP\_NUM\_THREADS} set to 4 (I double checked with
+{\tt echo \$OMP\_NUM\_THREADS})}
+
+\section*{Automatic Parallelization (40 marks)}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lr}
+    & {\bf Time (s)} \\
+    \hline
+    Run 1 & 0 \\
+    Run 2 & 0 \\
+    Run 3 & 0 \\
+    \hline
+    Average & 0 \\
+  \end{tabular}
+  \caption{Benchmark results for raytrace unoptimized sequential execution}
+  \label{tbl-raytrace-unopt-sequential}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lr}
+    & {\bf Time (s)} \\
+    \hline
+    Run 1 & 0 \\
+    Run 2 & 0 \\
+    Run 3 & 0 \\
+    \hline
+    Average & 0 \\
+  \end{tabular}
+  \caption{Benchmark results for raytrace optimized sequential execution}
+  \label{tbl-raytrace-opt-sequential}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lr}
+    & {\bf Time (s)} \\
+    \hline
+    Run 1 & 0 \\
+    Run 2 & 0 \\
+    Run 3 & 0 \\
+    \hline
+    Average & 0 \\
+  \end{tabular}
+  \caption{Benchmark results for raytrace with automatic parallelization}
+  \label{tbl-raytrace-automatic}
+\end{table}
+
+%% Refer to {\bf Table~\ref{tbl-raytrace-unopt-sequential}}, {\bf
+%% Table~\ref{tbl-raytrace-opt-sequential}}, and {\bf
+%% Table~\ref{tbl-raytrace-automatic}} in your explanation.
+
+\section*{Using OpenMP Tasks (30 marks)}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lr}
+    & {\bf Time (s)} \\
+    \hline
+    Run 1 & 0 \\
+    Run 2 & 0 \\
+    Run 3 & 0 \\
+    Run 4 & 0 \\
+    Run 5 & 0 \\
+    Run 6 & 0 \\
+    \hline
+    Average & 0 \\
+  \end{tabular}
+  \caption{Benchmark results for Fibonacci sequential execution ({\tt n} = \fibNumber{})}
+  \label{tbl-fib-sequential}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lr}
+    & {\bf Time (s)} \\
+    \hline
+    Run 1 & 0 \\
+    Run 2 & 0 \\
+    Run 3 & 0 \\
+    Run 4 & 0 \\
+    Run 5 & 0 \\
+    Run 6 & 0 \\
+    \hline
+    Average & 0 \\
+  \end{tabular}
+  \caption{Benchmark results for Fibonacci execution with OpenMP tasks ({\tt n} = \fibNumber{})}
+  \label{tbl-fib-tasks}
+\end{table}
+
+%% Refer to {\bf Table~\ref{tbl-fib-sequential}} and
+%% {\bf Table~\ref{tbl-fib-tasks}} in your explanation.
+
+\section*{Manual Parallelization with OpenMP (30 marks)}
+
+I placed the following OpenMP directives in my program...
+
+The following directives were effective...
+
+I tried these directives and they were not effective...
+
+With all annotations applied, here are the results:
+
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lr}
+    & {\bf Time (s)} \\
+    \hline
+    Run 1 & 0 \\
+    Run 2 & 0 \\
+    Run 3 & 0 \\
+    Run 4 & 0 \\
+    Run 5 & 0 \\
+    Run 6 & 0 \\
+    \hline
+    Average & 0 \\
+  \end{tabular}
+  \caption{Benchmark results for zeta execution with manual OpenMP ({\tt i} = \zetaIterations{})}
+  \label{tbl-zeta-openmp}
+\end{table}
+
+%% Explain why things got better.
+
+\end{document}
