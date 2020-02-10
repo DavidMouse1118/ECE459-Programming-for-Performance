@@ -49,30 +49,19 @@ typedef struct{
 }light;
 
 /* Subtract two vectors and return the resulting vector */
-vector vectorSub(vector *v1, vector *v2){
-	vector result = {v1->x - v2->x, v1->y - v2->y, v1->z - v2->z };
-	return result;
-}
+#define vectorSub(v1, v2) (vector) {*v1.x - *v2.x, *v1.y - *v2.y, *v1.z - *v2.z }
 
 /* Multiply two vectors and return the resulting scalar (dot product) */
-float vectorDot(vector *v1, vector *v2){
-	return v1->x * v2->x + v1->y * v2->y + v1->z * v2->z;
-}
+#define vectorDot(v1, v2) (float)(*v1.x * *v2.x + *v1.y * *v2.y + *v1.z * *v2.z)
 
 /* Calculate Vector x Scalar and return resulting Vector*/ 
-vector vectorScale(float c, vector *v){
-        vector result = {v->x * c, v->y * c, v->z * c };
-        return result;
-}
+#define vectorScale(c, v) (vector) {*v.x * c, *v.y * c, *v.z * c }
 
 /* Add two vectors and return the resulting vector */
-vector vectorAdd(vector *v1, vector *v2){
-        vector result = {v1->x + v2->x, v1->y + v2->y, v1->z + v2->z };
-        return result;
-}
+#define vectorAdd(v1, v2) (vector) {*v1.x + *v2.x, *v1.y + *v2.y, *v1.z + *v2.z }
 
 /* Check if the ray and sphere intersect */
-bool intersectRaySphere(ray *r, sphere *s, float *t){
+ bool intersectRaySphere(ray *r, sphere *s, float *t){
 	
 	bool retval = false;
 
@@ -119,7 +108,7 @@ bool intersectRaySphere(ray *r, sphere *s, float *t){
 			retval = false;
 	}
 
-return retval;
+	return retval;
 }
 
 /* Output data as PPM file */
