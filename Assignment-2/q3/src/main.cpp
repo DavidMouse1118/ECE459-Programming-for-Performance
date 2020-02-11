@@ -28,6 +28,10 @@ int gMaxSecretLen = 4;
 std::string gAlphabet = "abcdefghijklmnopqrstuvwxyz"
                         "0123456789";
 
+std::string message;
+std::string origSig;
+int found = 0;
+
 //-----------------------------------------------------------------------------
 // Helper
 //-----------------------------------------------------------------------------
@@ -47,6 +51,27 @@ bool isValidSecret(const std::string &message, const std::string &origSig, const
     assert(sigBufferLen == HASH_BYTES);
 
     return memcmp(sigBuffer, origSig.c_str(), HASH_BYTES) == 0;
+}
+
+void dfs(std::string gAlphabet, std::string secret, int gMaxSecretLen) {
+    if (found == 1) {
+        return;
+    }
+
+    if (secret.size() == gMaxSecretLen) {
+        return;
+    }
+
+    for (int i = 0; i < gAlphabet.size(); i++) {
+        std::string new_secret = gAlphabet[i] + secret;
+        // cout << new_secret << endl;
+        if (isValidSecret(message, origSig, new_secret)) {
+            cout << new_secret << endl;
+            found = 1;
+            return;
+        }
+        dfs(gAlphabet, new_secret, gMaxSecretLen);
+    }
 }
 
 //-----------------------------------------------------------------------------
@@ -88,19 +113,11 @@ int main(int argc, char const *argv[]) {
     getline(jwt, origSig64, '.');
 
     // Our goal is to find the secret to HMAC this string into our origSig
-    std::string message = header64 + '.' + payload64;
-    std::string origSig = base64_decode(origSig64);
+    message = header64 + '.' + payload64;
+    origSig = base64_decode(origSig64);
 
     // *****************************************************
     // ** Your job is to brute force all possible secrets **
     // *****************************************************
-    std::string secret = "Hello there";
-
-    if (isValidSecret(message, origSig, secret)) {
-        cout << secret << endl;
-    } else {
-        cerr << "General Kenobi, you are a bold one" << endl;
-    }
-
-    return 0;
+    dfs(gAlphabet, "", gMaxSecretLen);
 }
