@@ -11,7 +11,7 @@ JWT_TOKEN_4 := eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwi
 JWT_TOKEN_5 := eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.2fQveXQ-Af9-aI4lwINSON5WN1EyLDqFoHCxd3hnGjA 5 abcdefghijklmnopqrstuvwxyz0123456789
 JWT_TOKEN_6 := eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.KQl9CGnVpjtdQ-nB_gV-EyjpVy8cwUzgVkbL8ErFUJE 6 abcdefghijklmnopqrstuvwxyz0123456789
 
-EXEC_FLAGS := $(JWT_TOKEN_5)
+EXEC_FLAGS := $(JWT_TOKEN_6)
 
 #-------------------------------------------------------------------------------
 # Variables

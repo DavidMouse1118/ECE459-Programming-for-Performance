@@ -62,14 +62,15 @@ void dfs(std::string gAlphabet, std::string secret, int gMaxSecretLen) {
         return;
     }
 
+    #pragma omp parallel for shared(gAlphabet, secret, gMaxSecretLen)
     for (int i = 0; i < gAlphabet.size(); i++) {
         std::string new_secret = gAlphabet[i] + secret;
-        // cout << new_secret << endl;
+
         if (isValidSecret(message, origSig, new_secret)) {
             cout << new_secret << endl;
             found = 1;
-            return;
         }
+        
         dfs(gAlphabet, new_secret, gMaxSecretLen);
     }
 }

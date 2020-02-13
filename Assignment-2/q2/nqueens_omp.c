@@ -25,8 +25,9 @@ void nqueens(char *config, int n, int i)
 
     if (i==n)
     {
-        #pragma omp critical
+        #pragma omp atomic
         count++;
+        return;
     }
     
     /* try each possible position for queen <i> */
@@ -49,7 +50,6 @@ void nqueens(char *config, int n, int i)
 int main(int argc, char *argv[])
 {
     int n;
-    char *config;
 
     if (argc < 2)
     {
@@ -58,31 +58,23 @@ int main(int argc, char *argv[])
     }
 
     n = atoi(argv[1]);
-    config = malloc(n * sizeof(char));
 
     printf("running queens %d\n", n);
 
-    int j;
     // parallel on the first row (i = 0)
-    // #pragma omp parallel shared(config, n) private(new_config)
     #pragma omp parallel
     {
-        // #pragma omp single private(new_config)
         #pragma omp single
         {
-            for (j=0; j<n; j++) 
-            {
-                // #pragma omp task shared(config, n) firstprivate(j) private(new_config)
-                #pragma omp task shared(config, n)
+            for (int j=0; j<n; j++) {
+                #pragma omp task shared(n) firstprivate(j)
                 {
                     char *new_config;
                     new_config = malloc((1)*sizeof(char));
-                    memcpy(new_config, config, 0*sizeof(char));
-                    if (safe(new_config, 0, j))
-                    {
-                        new_config[0] = j;
-                        nqueens(new_config, n, 1);
-                    }
+                    new_config[0] = j;
+
+                    nqueens(new_config, n, 1);
+
                     free(new_config);
                 }
             }
@@ -90,6 +82,5 @@ int main(int argc, char *argv[])
     }
 
     printf("# solutions: %d\n", count);
-    free( config );
     return 0;
 }
