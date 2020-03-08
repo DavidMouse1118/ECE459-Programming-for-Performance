@@ -122,6 +122,23 @@ void Simulation::print() {
 #define __CL_ENABLE_EXCEPTIONS
 #include <CL/cl.hpp>
 
+void print_output(std::vector<char> types, std::vector<cl_float3> p_out) {
+    int digitsAfterDecimal = 5;
+    int width = digitsAfterDecimal + std::string("-0.e+00").length();
+    
+    for(std::size_t i = 0; i < p_out.size(); ++i) {
+        cout << types[i] << ","
+            << std::scientific
+            << std::setprecision(digitsAfterDecimal)
+            << std::setw(width)
+            << p_out[i].s[0] << ","
+            << std::setw(width)
+            << p_out[i].s[1] << ","
+            << std::setw(width)
+            << p_out[i].s[2] << endl;
+    }
+}
+
 void Simulation::run() {
     try { 
         // Get available platforms
@@ -161,21 +178,261 @@ void Simulation::run() {
             std::cerr << program.getBuildInfo<CL_PROGRAM_BUILD_LOG>(devices[0]) << std::endl;
             throw;
         }
+
+        std::vector<char> types;
+        std::vector<cl_float3> positions_0;
+        std::vector<cl_float3> positions_1;
+        std::vector<cl_float3> forces_0;
+        std::vector<cl_float3> forces_1;
+
+        for(std::size_t i=0; i < y0.size(); ++i) {
+            Particle *p = y0[i];
+
+            // Copy types
+            if (p->type == 1) {
+                types.push_back('p');
+            }
+            if (p->type == 2) {
+                types.push_back('e');
+            }
+
+            Vec3 position = p->position;
+            float x = position.x;
+            float y = position.y;
+            float z = position.z;
+
+            // Copy position
+            cl_float3 new_position = (cl_float3){x, y, z};
+            positions_0.push_back(new_position);
+            positions_1.push_back(new_position);
+
+            // Copy force
+            cl_float3 new_force = {{0, 0, 0}};
+            forces_0.push_back(new_force);
+            forces_1.push_back(new_force);
+        }
  
         // Make kernels
-        cl::Kernel kernel(program, "simulation");
- 
+        cl::Kernel kernel_computeForces_0(program, "computeForces");
+        cl::Kernel kernel_computeForces_1(program, "computeForces");
+        cl::Kernel kernel_computeApproxPositions(program, "computePositions");
+        cl::Kernel kernel_computeBetterPositions(program, "computePositions");
+        cl::Kernel kernel_isErrorAcceptable(program, "isErrorAcceptable");
+
+        float h = initTimeStep;
+        const int numParticles = y0.size();
+
         // Create buffers
- 
-        // Write buffers
+        cl::Buffer buffer_h = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            sizeof(float)
+        );
+
+        cl::Buffer buffer_types = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            types.size() * sizeof(char)
+        );
+        
+        cl::Buffer buffer_positions_0 = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            positions_0.size() * sizeof(cl_float3)
+        );
+
+        cl::Buffer buffer_positions_1 = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            positions_1.size() * sizeof(cl_float3)
+        );
+
+        cl::Buffer buffer_forces_0 = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            forces_0.size() * sizeof(cl_float3)
+        );
+
+        cl::Buffer buffer_forces_1 = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            forces_1.size() * sizeof(cl_float3)
+        );
+
+        cl::Buffer buffer_success = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            sizeof(cl_int)
+        );
 
         // Set arguments to kernel
+        kernel_computeForces_0.setArg(0, buffer_h);
+        kernel_computeForces_0.setArg(1, buffer_types);
+        kernel_computeForces_0.setArg(2, buffer_positions_0);
+        kernel_computeForces_0.setArg(3, buffer_forces_0);
 
-        // Run the kernel on specific ND range
-        cl::NDRange globalSize(1);
-        queue.enqueueNDRangeKernel(kernel, cl::NullRange, globalSize); 
- 
+        kernel_computeForces_1.setArg(0, buffer_h);
+        kernel_computeForces_1.setArg(1, buffer_types);
+        kernel_computeForces_1.setArg(2, buffer_positions_0);
+        kernel_computeForces_1.setArg(3, buffer_forces_1);
+
+        kernel_computeApproxPositions.setArg(0, buffer_h);
+        kernel_computeApproxPositions.setArg(1, buffer_types);
+        kernel_computeApproxPositions.setArg(2, buffer_forces_0);
+        kernel_computeApproxPositions.setArg(3, buffer_forces_0);
+        kernel_computeApproxPositions.setArg(4, buffer_positions_0);
+
+        kernel_computeBetterPositions.setArg(0, buffer_h);
+        kernel_computeBetterPositions.setArg(1, buffer_types);
+        kernel_computeBetterPositions.setArg(2, buffer_forces_0);
+        kernel_computeBetterPositions.setArg(3, buffer_forces_1);
+        kernel_computeBetterPositions.setArg(4, buffer_positions_1);
+
+        kernel_isErrorAcceptable.setArg(0, errorTolerance);
+        kernel_isErrorAcceptable.setArg(1, buffer_positions_0);
+        kernel_isErrorAcceptable.setArg(2, buffer_positions_1);
+        kernel_isErrorAcceptable.setArg(3, buffer_success);
+
+        // // Run the kernel on specific ND range
+        cl::NDRange globalSize(numParticles);
+
+        queue.enqueueWriteBuffer(
+            buffer_types,
+            CL_TRUE,
+            0,
+            types.size() * sizeof(char),
+            types.data()
+        );
+
+        queue.enqueueWriteBuffer(
+            buffer_h,
+            CL_TRUE,
+            0,
+            sizeof(cl_int),
+            &h
+        );
+
+        queue.enqueueWriteBuffer(
+            buffer_forces_0,
+            CL_TRUE,
+            0,
+            forces_0.size() * sizeof(cl_float3),
+            forces_0.data()
+        );
+
+        queue.enqueueWriteBuffer(
+            buffer_positions_0,
+            CL_TRUE,
+            0,
+            positions_0.size() * sizeof(cl_float3),
+            positions_0.data()
+        );
+
+        // computeForces(k0, y0); // Compute k0
+        queue.enqueueNDRangeKernel(
+            kernel_computeForces_0, 
+            cl::NullRange, 
+            globalSize
+        );
+
+        cl_int *success = new cl_int();
+        *success = 0;
+
+        while (*success == 0) {
+            // k1.clear();
+            queue.enqueueWriteBuffer(
+                buffer_forces_1,
+                CL_TRUE,
+                0,
+                forces_1.size() * sizeof(cl_float3),
+                forces_1.data()
+            );
+
+            // reset(y1);
+            queue.enqueueWriteBuffer(
+                buffer_positions_0,
+                CL_TRUE,
+                0,
+                positions_0.size() * sizeof(cl_float3),
+                positions_0.data()
+            );
+
+            // reset(z1);
+            queue.enqueueWriteBuffer(
+                buffer_positions_1,
+                CL_TRUE,
+                0,
+                positions_1.size() * sizeof(cl_float3),
+                positions_1.data()
+            );
+
+            // computeApproxPositions(h); // Compute y1
+            queue.enqueueNDRangeKernel(
+                kernel_computeApproxPositions, 
+                cl::NullRange,
+                globalSize
+            );
+
+            // computeForces(k1, y1); // Compute k1
+            queue.enqueueNDRangeKernel(
+                kernel_computeForces_1, 
+                cl::NullRange, 
+                globalSize
+            );
+
+            // computeBetterPositions(h); // Compute z1
+            queue.enqueueNDRangeKernel(
+                kernel_computeBetterPositions, 
+                cl::NullRange,
+                globalSize
+            );
+
+            *success = 1;
+            queue.enqueueWriteBuffer(
+                buffer_success,
+                CL_TRUE,
+                0,
+                sizeof(cl_int),
+                success
+            );
+
+            // isErrorAcceptable(z1, y1)
+            queue.enqueueNDRangeKernel(
+                kernel_isErrorAcceptable, 
+                cl::NullRange,
+                globalSize
+            );
+
+            queue.enqueueReadBuffer(
+                buffer_success,
+                CL_TRUE,
+                0,
+                sizeof(cl_int),
+                success
+            );
+
+            h /= 2.0;
+
+            queue.enqueueWriteBuffer(
+                buffer_h,
+                CL_TRUE,
+                0,
+                sizeof(cl_int),
+                &h
+            );
+        } 
+
         // Read buffer(s)
+        std::vector<cl_float3> *out_positions_1 = new std::vector<cl_float3>(positions_1.size());
+        queue.enqueueReadBuffer(
+            buffer_positions_1,
+            CL_TRUE,
+            0,
+            positions_1.size() * sizeof(cl_float3),
+            (*out_positions_1).data()
+        );
+        
+        print_output(types, *out_positions_1);
     } catch(cl::Error error) {
         std::cout << error.what() << "(" << error.err() << ")" << std::endl;
     }
