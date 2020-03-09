@@ -99,25 +99,6 @@ int main(int argc, char const *argv[]) {
         // Create a command queue and use the first device
         cl::CommandQueue queue = cl::CommandQueue(context, devices[0]);
 
-        // cl_int err = CL_SUCCESS;
-
-        // cl_uint uiMaxUnits = devices[0].getInfo< CL_DEVICE_MAX_COMPUTE_UNITS >( &err );
-
-        // size_t stMaxWorkGroup = devices[0].getInfo< CL_DEVICE_MAX_WORK_GROUP_SIZE >( &err );
-
-        // cl_uint uiMaxDim = devices[0].getInfo< CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS >( &err );
-
-        // std::vector< size_t > uiMaxDimSizes = devices[0].getInfo< CL_DEVICE_MAX_WORK_ITEM_SIZES >( &err );
-
-        // std::cout  << "CL_DEVICE_MAX_COMPUTE_UNITS : " << uiMaxUnits << std::endl;
-        // std::cout  << "CL_DEVICE_MAX_WORK_GROUP_SIZE : " << stMaxWorkGroup << std::endl;
-        // std::cout  << "CL_DEVICE_MAX_WORK_ITEM_DIMENSIONS : " << uiMaxDim << std::endl;
-        // for( size_t wis = 0; wis < uiMaxDimSizes.size( ); ++wis )
-        // {
-        //     std::stringstream dimString;
-        //     dimString << "Dimension[ " << wis << " ] : ";
-        //     std::cout << dimString.str( ) << uiMaxDimSizes[ wis ] << std::endl;
-        // }
         // Read source file
         std::ifstream sourceFile("src/jwtcracker.cl");
             if(!sourceFile.is_open()){
@@ -167,6 +148,18 @@ int main(int argc, char const *argv[]) {
             strlen(gAlphabet_char)
         );
 
+        cl::Buffer buffer_cur_secret_len = cl::Buffer(
+            context,
+            CL_MEM_READ_ONLY,
+            sizeof(cl_int)
+        );
+
+        cl::Buffer buffer_found = cl::Buffer(
+            context,
+            CL_MEM_READ_WRITE,
+            sizeof(cl_int)
+        );
+
         cl::Buffer buffer_secret = cl::Buffer(
             context,
             CL_MEM_WRITE_ONLY,
@@ -203,27 +196,63 @@ int main(int argc, char const *argv[]) {
         kernel.setArg(1, buffer_origSig); 
         kernel.setArg(2, buffer_gAlphabet);
         kernel.setArg(3, buffer_secret);
+        kernel.setArg(4, buffer_cur_secret_len);
+        kernel.setArg(5, buffer_found);
 
-        // Run the kernel on specific ND range
-        cl::NDRange globalSize(pow(gAlphabet.length(), gMaxSecretLen));
-        cl::NDRange local(256);
-        queue.enqueueNDRangeKernel(
-            kernel, 
-            cl::NullRange, 
-            globalSize,
-            local); 
- 
-        // Read buffer(s)
-        char* secret = new char[gMaxSecretLen + 1]; 
-        queue.enqueueReadBuffer(
-            buffer_secret,
+        cl_int *found = new cl_int();
+        *found = 0;
+
+        queue.enqueueWriteBuffer(
+            buffer_found,
             CL_TRUE,
             0,
-            gMaxSecretLen + 1, 
-            secret
+            sizeof(cl_int),
+            found
         );
 
-        std::cout << std::string(secret) << endl;
+        // Loop through different secret length from [1, gMaxSecretLen]
+        for (int i = 1; i <= gMaxSecretLen; i++) {
+            cl_int cur_secret_len = i;
+            // printf("cur_secret_len: %d\n", cur_secret_len);
+
+            queue.enqueueWriteBuffer(
+                buffer_cur_secret_len,
+                CL_TRUE,
+                0,
+                sizeof(cl_int),
+                &cur_secret_len
+            );
+
+            cl::NDRange globalSize(pow(gAlphabet.length(), cur_secret_len));
+
+            queue.enqueueNDRangeKernel(
+                kernel, 
+                cl::NullRange, 
+                globalSize); 
+
+            queue.enqueueReadBuffer(
+                buffer_found,
+                CL_TRUE,
+                0,
+                sizeof(cl_int),
+                found
+            );
+
+            if (*found == 1) {
+                // secret is found. Read secret from buffer
+                char* secret = new char[gMaxSecretLen + 1]; 
+                queue.enqueueReadBuffer(
+                    buffer_secret,
+                    CL_TRUE,
+                    0,
+                    gMaxSecretLen + 1, 
+                    secret
+                );
+
+                std::cout << std::string(secret) << endl;
+                break;
+            }
+        }
     } catch(cl::Error error) {
         std::cout << error.what() << "(" << error.err() << ")" << std::endl;
     }

@@ -24,11 +24,7 @@ float getMass(char type) {
 }
 
 float magnitude(float3 vec) {
-    return sqrt( (float)(
-        pow(vec.x, 2.0f) +
-        pow(vec.y, 2.0f) +
-        pow(vec.z, 2.0f) )
-    );
+    return sqrt((float)(pow(vec.x, 2.0f) + pow(vec.y, 2.0f) + pow(vec.z, 2.0f)));
 }
 
 float print_float3(float3 vec) {

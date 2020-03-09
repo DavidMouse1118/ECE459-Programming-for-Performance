@@ -281,12 +281,17 @@ __kernel void bruteForceJWT(
     __global const uchar *message,
     __global const uchar *origSig,
     __global const uchar *gAlphabet, 
-    __global uchar *secret
+    __global uchar *secret,
+    __global int *cur_secret_len,
+    __global int *found
     )
 {
     size_t g_id = get_global_id(0);
+    // printf("g_id: %d\n", g_id);
+    // printf("*cur_secret_len: %d\n", *cur_secret_len);
+    // printf("*found: %d\n", *found);
 
-    // Initialize possible secret
+    // Initialize possible secret with padding
     uchar possible_secret[gMaxSecretLen];
     for (int i = 0; i < gMaxSecretLen; i ++) {
         possible_secret[i] = gAlphabet[0];
@@ -306,6 +311,8 @@ __kernel void bruteForceJWT(
         idx ++;
     }
 
+    // printf("possible_secret: %s\n", possible_secret);
+
     // Convert message to uint8
     uint8_t int_message[messageLength];
     for (int i = 0; i < messageLength; i++) {
@@ -318,35 +325,33 @@ __kernel void bruteForceJWT(
         int_secret[i] = (uint8_t) possible_secret[i];
     }
 
-    for (int secret_len = idx; secret_len <= gMaxSecretLen; secret_len++) {
-        // Vertify secret
-        uint8_t sigBuffer[32];
-        uint8_t messageBuffer[messageLength + BLOCK_BYTES];
+    // Vertify secret
+    uint8_t sigBuffer[32];
+    uint8_t messageBuffer[messageLength + BLOCK_BYTES];
 
-        HMAC_SHA256(
-            int_secret,
-            secret_len,
-            int_message, 
-            messageLength,
-            messageBuffer,
-            sigBuffer
-        );
+    HMAC_SHA256(
+        int_secret,
+        *cur_secret_len,
+        int_message, 
+        messageLength,
+        messageBuffer,
+        sigBuffer
+    );
 
-        // Compare sigBuffer with origSig
-        int isSecretCorrect = 1;
-        for (int i = 0; i < HASH_BYTES; i++) {
-            if (sigBuffer[i] != (uint8_t) origSig[i]) {
-                // Invalid Secret
-                isSecretCorrect = 0;
-            }
+    // Compare sigBuffer with origSig
+    int isSecretCorrect = 1;
+    for (int i = 0; i < HASH_BYTES; i++) {
+        if (sigBuffer[i] != (uint8_t) origSig[i]) {
+            // Invalid Secret
+            isSecretCorrect = 0;
         }
+    }
 
-        // Write out to the output buffer if the secret is correct
-        if (isSecretCorrect == 1) {
-            // printf("Secret is found!\n");
-            for (int i = 0; i < gMaxSecretLen; i++) {
-                secret[i] = possible_secret[i];
-            }
+    // Write out to the output buffer if the secret is correct
+    if (isSecretCorrect == 1) {
+        *found = 1;
+        for (int i = 0; i < *cur_secret_len; i++) {
+            secret[i] = possible_secret[i];
         }
     }
 }
