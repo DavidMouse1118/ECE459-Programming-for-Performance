@@ -266,15 +266,13 @@ void Simulation::run() {
         );
 
         // Set arguments to kernel
-        kernel_computeForces_0.setArg(0, buffer_h);
-        kernel_computeForces_0.setArg(1, buffer_types);
-        kernel_computeForces_0.setArg(2, buffer_positions_0);
-        kernel_computeForces_0.setArg(3, buffer_forces_0);
+        kernel_computeForces_0.setArg(0, buffer_types);
+        kernel_computeForces_0.setArg(1, buffer_positions_0);
+        kernel_computeForces_0.setArg(2, buffer_forces_0);
 
-        kernel_computeForces_1.setArg(0, buffer_h);
-        kernel_computeForces_1.setArg(1, buffer_types);
-        kernel_computeForces_1.setArg(2, buffer_positions_0);
-        kernel_computeForces_1.setArg(3, buffer_forces_1);
+        kernel_computeForces_1.setArg(0, buffer_types);
+        kernel_computeForces_1.setArg(1, buffer_positions_0);
+        kernel_computeForces_1.setArg(2, buffer_forces_1);
 
         kernel_computeApproxPositions.setArg(0, buffer_h);
         kernel_computeApproxPositions.setArg(1, buffer_types);

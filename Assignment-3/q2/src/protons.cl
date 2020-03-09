@@ -37,7 +37,6 @@ float3 normal(float3 a) {
 }
 
 __kernel void computeForces(
-	__global float *h,
 	__global const char *types,
 	__global float3 *positions,
 	__global float3 *forces
@@ -57,11 +56,6 @@ __kernel void computeForces(
 
 			forces[id] += (float3) normal(direction) * (float) (coulombConstant * q1 * q2 / pow(r, 2.0f));
 		}
-		// if (id == 49) {
-		// 	printf("computeForces\n");
-		// 	print_float3(positions[id]);
-		// 	print_float3(forces[id]);
-		// }
 	}
 }
 
@@ -74,31 +68,14 @@ __kernel void computePositions(
 ) {
 	int id = get_global_id(0);
 
-	// printf("%d\n", id);
-
 	float mass = getMass(types[id]);
-	// printf("%.40f\n", mass);
 
 	float3 f0 = forces_0[id];
 	float3 f1 = forces_1[id];
 
-	// print_float3(f0);
-	// print_float3(f1);
-
 	float3 avgForce = (f0 + f1) / 2.0f;
-	// print_float3(avgForce);
-	// printf("pow(*h, 2.0f) %f\n", pow(*h, 2.0f));
-	// printf("%d\n", avgForce.x);
 	float3 deltaDist = avgForce * pow(*h, 2.0f) / mass;
-
-	// printf("%d\n", deltaDist.x);
 	positions[id] += deltaDist;
-	// if (id == 49) {
-	// 	printf("computeApproxPositions\n");
-	// 	print_float3(f0);
-	// 	print_float3(f1);
-	// 	print_float3(positions[id]);
-	// }
 }
 
 __kernel void isErrorAcceptable(
@@ -108,19 +85,6 @@ __kernel void isErrorAcceptable(
 	__global int *success
 ) {
 	int id = get_global_id(0);
-	// printf("errorTolerance: %.10f\n", errorTolerance);
-	// printf("success: %d\n", *success);
-	// printf("positions_0: ");
-	// print_float3(positions_0[id]);
-	// printf("positions_1: ");
-	// if (id == 49) {
-	// 	printf("isErrorAcceptable\n");
-	// 	print_float3(positions_0[id]);
-	// 	print_float3(positions_1[id]);
-	// 	print_float3(positions_0[id] - positions_1[id]);
-	// 	printf("magnitude(positions_0[id] - positions_1[id]): %.10f\n", magnitude(positions_0[id] - positions_1[id]));
-	// }
-
 
 	if (magnitude(positions_1[id] - positions_0[id]) > errorTolerance) {
 		*success = 0;
