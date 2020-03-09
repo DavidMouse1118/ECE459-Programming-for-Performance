@@ -213,7 +213,6 @@ int main(int argc, char const *argv[]) {
         // Loop through different secret length from [1, gMaxSecretLen]
         for (int i = 1; i <= gMaxSecretLen; i++) {
             cl_int cur_secret_len = i;
-            // printf("cur_secret_len: %d\n", cur_secret_len);
 
             queue.enqueueWriteBuffer(
                 buffer_cur_secret_len,
@@ -240,15 +239,15 @@ int main(int argc, char const *argv[]) {
 
             if (*found == 1) {
                 // secret is found. Read secret from buffer
-                char* secret = new char[gMaxSecretLen + 1]; 
+                char* secret = new char[cur_secret_len + 1]; 
                 queue.enqueueReadBuffer(
                     buffer_secret,
                     CL_TRUE,
                     0,
-                    gMaxSecretLen + 1, 
+                    cur_secret_len + 1, 
                     secret
                 );
-
+                
                 std::cout << std::string(secret) << endl;
                 break;
             }

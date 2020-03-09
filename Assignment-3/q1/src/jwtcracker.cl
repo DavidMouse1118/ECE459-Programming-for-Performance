@@ -287,9 +287,6 @@ __kernel void bruteForceJWT(
     )
 {
     size_t g_id = get_global_id(0);
-    // printf("g_id: %d\n", g_id);
-    // printf("*cur_secret_len: %d\n", *cur_secret_len);
-    // printf("*found: %d\n", *found);
 
     // Initialize possible secret with padding
     uchar possible_secret[gMaxSecretLen];
@@ -310,8 +307,6 @@ __kernel void bruteForceJWT(
         g_id = g_id / 36;
         idx ++;
     }
-
-    // printf("possible_secret: %s\n", possible_secret);
 
     // Convert message to uint8
     uint8_t int_message[messageLength];
