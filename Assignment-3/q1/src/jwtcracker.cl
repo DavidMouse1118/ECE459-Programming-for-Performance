@@ -277,6 +277,19 @@ void HMAC_SHA256(const uint8_t* secret,
 // Kernel
 //-----------------------------------------------------------------------------
 
+int strlen(__global uchar *p)
+{
+    int count = 0;
+ 
+    while(*p != '\0')
+    {
+        count++;
+        p++;
+    }
+ 
+    return count;
+}
+
 __kernel void bruteForceJWT(
     __global const uchar *message,
     __global const uchar *origSig,
@@ -296,15 +309,16 @@ __kernel void bruteForceJWT(
 
     // Convert id to Base36 (the possible secret)
     int idx = 0;
-
+    int gAlphabet_len = strlen(gAlphabet);
+    
     if (g_id == 0) {
-        possible_secret[idx] = gAlphabet[g_id % 36];
+        possible_secret[idx] = gAlphabet[g_id % gAlphabet_len];
         idx += 1;
     }
 
     while (g_id > 0) {
-        possible_secret[idx] = gAlphabet[g_id % 36];
-        g_id = g_id / 36;
+        possible_secret[idx] = gAlphabet[g_id % gAlphabet_len];
+        g_id = g_id / gAlphabet_len;
         idx ++;
     }
 
