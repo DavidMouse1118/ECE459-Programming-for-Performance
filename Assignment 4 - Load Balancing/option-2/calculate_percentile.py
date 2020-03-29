@@ -6,7 +6,7 @@ import numpy as np
 import csv
 from glob import glob
 
-filenames = glob("results_*.csv")
+filenames = glob("results.csv")
 # results_{timestamp}_n={n}_a={a}_j={j}_l={l}_m={m}_b={b}_g={g}_.csv
 
 output_file_name = "experimental_results.csv"
