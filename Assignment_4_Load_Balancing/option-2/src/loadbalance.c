@@ -209,6 +209,8 @@ int main(int argc, char **argv) {
     for ( int l = 0; l < num_queues; ++l ) {
         pthread_mutex_destroy(queues[l].mutex);
         free(queues[l].mutex);
+        free(queues[l].head);
+        free(queues[l].tail);
     }
 
     free(queues);
@@ -225,7 +227,14 @@ void *fetch_and_execute( void* arg ) {
     queue_t* my_q = (queue_t*) arg;
 
 
-    while(0 == terminate) {
+    while(1) {
+        pthread_mutex_lock( &completed_mutex );
+        if (1 == terminate) {
+            pthread_mutex_unlock( &completed_mutex );
+            break;
+        }
+        pthread_mutex_unlock( &completed_mutex );
+        
         pthread_mutex_lock( my_q->mutex );
         if (my_q->size == 0) { // skip if the queue is empty
             pthread_mutex_unlock( my_q->mutex );
@@ -372,6 +381,7 @@ void add_list(queue_t* q, job_t* list_head, job_t* list_tail, int size) {
     q->size += size;
 }
 
+// offload from q to offload_q
 void offload(queue_t* q, queue_t* offload_q, int offload_size) {
     if (offload_size == 0) {
         return;
@@ -398,14 +408,23 @@ void *load_balance( void* args ) {
     queue_t* offload_q = malloc(sizeof(queue_t));
     init(offload_q);
 
-    while(0 == terminate) {
+    while(1) {
+        pthread_mutex_lock( &completed_mutex );
+        if (1 == terminate) {
+            pthread_mutex_unlock( &completed_mutex );
+            break;
+        }
+        pthread_mutex_unlock( &completed_mutex );
         int total_size = 0;
         for (int i = 0; i < num_queues; i++) {
             pthread_mutex_lock(queues[i].mutex);
+            // printf("%d ", queues[i].size);
             total_size += queues[i].size;
         }
+        // printf("\n");
 
         int avg_size = CEIL(total_size, num_queues);
+        // printf("avg %d\n", avg_size);
         if (avg_size > 0) {
             //offload job from overloaded queue
             for (int i = 0; i < num_queues; i++) {
@@ -434,9 +453,13 @@ void *load_balance( void* args ) {
             pthread_mutex_unlock(queues[i].mutex);
         }
 
-        usleep(1 * lambda);
+        usleep(200 * lambda);
     }
-    
+
+    pthread_mutex_destroy(offload_q->mutex);
+    free(offload_q->mutex);
+    free(offload_q->head);
+    free(offload_q->tail);
     free(offload_q);
     pthread_exit( NULL );
 }
