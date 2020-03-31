@@ -1,24 +1,23 @@
 #pragma once
 
 #include <cassert>
+#include <iostream>
+#include <deque>
+
+using std::cout;
+using std::endl;
+using std::deque;
 
 template<typename T>
 class Container
 {
-    T* storage = nullptr;
-    int len = 0;
+    deque<T> storage; 
 
     void deepCopy(const Container &other) {
-        len = other.len;
+        storage.clear();
 
-        delete [] storage;
-        storage = nullptr;
-
-        if (other.storage) {
-            storage = new T[len];
-            for (int i = 0; i < len; i++) {
-                storage[i] = other.storage[i];
-            }
+        for (int i = 0; i < other.storage.size(); i++) {
+            storage.push_back(other.storage[i]);
         }
     }
 
@@ -44,11 +43,11 @@ public:
     }
 
     int size() const {
-        return len;
+        return storage.size();
     }
 
     T operator[](int idx) const {
-        if (!(0 <= idx && idx < len)) {
+        if (!(0 <= idx && idx < storage.size())) {
             assert(false && "Accessing index out of range");
         }
 
@@ -56,9 +55,7 @@ public:
     }
 
     void clear() {
-        delete [] storage;
-        storage = nullptr;
-        len = 0;
+        storage.clear();
     }
 
     T front() const {
@@ -66,53 +63,20 @@ public:
     }
 
     void pushFront(T item) {
-        T* oldStorage = storage;
-
-        len += 1;
-        storage = new T[len];
-
-        storage[0] = item;
-        for (int i = 1; i < len; i++) {
-            storage[i] = oldStorage[i - 1];
-        }
-
-        delete [] oldStorage;
+        storage.push_front(item);
     }
 
     void pushBack(T item) {
-        T* oldStorage = storage;
-
-        len += 1;
-        storage = new T[len];
-
-        storage[len - 1] = item;
-        for (int i = 0; i < len - 1; i++) {
-            storage[i] = oldStorage[i];
-        }
-
-        delete [] oldStorage;
+        storage.push_back(item);
     }
 
     T popFront() {
-        if (len < 1) {
+        if (storage.size() < 1) {
             assert(false && "Trying to pop an empty Container");
         }
 
-        T* oldStorage = storage;
-        T front = oldStorage[0];
-
-        len -= 1;
-
-        if (len == 0) {
-            storage = nullptr;
-        } else {
-            storage = new T[len];
-            for (int i = 0; i < len; i++) {
-                storage[i] = oldStorage[i + 1];
-            }
-        }
-
-        delete [] oldStorage;
+        T front = storage[0];
+        storage.pop_front();
         return front;
     }
 

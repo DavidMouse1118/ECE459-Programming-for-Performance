@@ -14,8 +14,8 @@ class Student : public ChecksumTracker<Student, ChecksumType::PACKAGE>, public C
     Idea* currentIdea = nullptr;
     Container<Package*> currentPackages;
 
-    std::string getIdeaChecksum();
-    std::string getPackagesChecksum();
+    uint8_t* getIdeaChecksum();
+    uint8_t* getPackagesChecksum();
     void buildIdea();
 
 public:

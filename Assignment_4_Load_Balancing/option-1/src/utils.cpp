@@ -42,10 +42,11 @@ std::string bytesToString(uint8_t* bytes, int len) {
         ss << std::hex << std::setw(2) << std::setfill('0') << (int)bytes[i];
     }
 
+    delete [] bytes;
     return ss.str();
 }
 
-std::string sha256(const std::string str) {
+uint8_t* sha256(const std::string str) {
     uint8_t* hash = new uint8_t[SHA256_DIGEST_LENGTH];
 
     SHA256_CTX sha256;
@@ -53,18 +54,14 @@ std::string sha256(const std::string str) {
     SHA256_Update(&sha256, str.c_str(), str.size());
     SHA256_Final(hash, &sha256);
 
-    std::string s = bytesToString(hash, SHA256_DIGEST_LENGTH);
-    delete [] hash;
-    return s;
+    return hash;
 }
 
-std::string initChecksum() {
-    std::string checksum;
-
+uint8_t* initChecksum() {
+    uint8_t* checksum = new uint8_t[SHA256_DIGEST_LENGTH];
     for (int i = 0; i < SHA256_DIGEST_LENGTH; i++) {
-        checksum += "00";
+        checksum[i] = 0;
     }
-
     return checksum;
 }
 
@@ -81,22 +78,8 @@ uint8_t hexStrToByte(std::string s) {
     return x;
 }
 
-std::string xorChecksum(std::string baseLayer, std::string newLayer) {
-    std::string checksum;
-
-    assert(newLayer.size() == baseLayer.size());
-
-    for (int i = 0; i < newLayer.size(); i += 2) {
-        uint8_t* byte = new uint8_t[1];
-
-        std::string a = std::string(1, baseLayer[i]) + std::string(1, baseLayer[i + 1]);
-        std::string b = std::string(1, newLayer [i]) + std::string(1, newLayer [i + 1]);
-
-        byte[0] = hexStrToByte(a) ^ hexStrToByte(b);
-        checksum += bytesToString(byte, 1);
-
-        delete [] byte;
+void xorChecksum(uint8_t* baseLayer, uint8_t* newLayer) {
+    for (int i = 0; i < SHA256_DIGEST_LENGTH; i ++) {
+        baseLayer[i] = baseLayer[i] ^ newLayer[i];
     }
-
-    return checksum;
 }

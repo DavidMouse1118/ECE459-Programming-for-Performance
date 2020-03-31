@@ -58,27 +58,30 @@ Container<StrPair> crossProduct(Container<std::string> a, Container<std::string>
     return result;
 }
 
-std::string IdeaGenerator::getNextIdea(int i) {
-    Container<std::string> products = readFile("data/ideas-products.txt");
-    Container<std::string> customers = readFile("data/ideas-customers.txt");
-    Container<StrPair> ideas = crossProduct(products, customers);
+// std::string IdeaGenerator::getNextIdea(int i, Container<StrPair> ideas) {
+//     auto ideaPair = ideas[i % ideas.size()];
 
-    assert(ideas.size() > 0);
-    auto ideaPair = ideas[i % ideas.size()];
-
-    return ideaPair.a + " for " + ideaPair.b;
-}
+//     return ideaPair.a + " for " + ideaPair.b;
+// }
 
 void IdeaGenerator::run() {
     int packagesPerIdea = numPackages / numIdeas;
     int ideasWithExtraPackage = numPackages % numIdeas;
 
+    Container<std::string> products = readFile("data/ideas-products.txt");
+    Container<std::string> customers = readFile("data/ideas-customers.txt");
+    Container<StrPair> ideas = crossProduct(products, customers);
+    assert(ideas.size() > 0);
+
     for (int i = ideaStartIdx; i <= ideaEndIdx; i++) {
-        std::string ideaName = getNextIdea(i);
+        auto ideaPair = ideas[i % ideas.size()];
+        std::string ideaName = ideaPair.a + " for " + ideaPair.b;
         int packagesReq = packagesPerIdea + (((i - ideaStartIdx) < ideasWithExtraPackage) ? 1 : 0);
 
         eq->enqueueEvent(Event(Event::NEW_IDEA, new Idea(ideaName, packagesReq)));
-        updateGlobalChecksum(sha256(ideaName));
+        uint8_t* checksum = sha256(ideaName);
+        updateGlobalChecksum(checksum);
+        delete [] checksum;
     }
 
     for (int i = 0; i < numStudents; i++) {

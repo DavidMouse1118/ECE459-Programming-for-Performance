@@ -9,8 +9,8 @@ std::string readFileLine(std::string fileName, int targetLineNum);
 
 std::string bytesToString(uint8_t* bytes, int len);
 
-std::string sha256(const std::string str);
+uint8_t* sha256(const std::string str);
 
-std::string initChecksum();
+uint8_t* initChecksum();
 
-std::string xorChecksum(std::string baseLayer, std::string newLayer);
+void xorChecksum(uint8_t* baseLayer, uint8_t* newLayer);

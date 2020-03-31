@@ -21,10 +21,14 @@ PackageDownloader::~PackageDownloader() {
 }
 
 void PackageDownloader::run() {
+    Container<std::string> packages = readFile("data/packages.txt");
+
     for (int i = packageStartIdx; i <= packageEndIdx; i++) {
-        std::string packageName = readFileLine("data/packages.txt", i);
+        std::string packageName = packages[i % packages.size()];
 
         eq->enqueueEvent(Event(Event::DOWNLOAD_COMPLETE, new Package(packageName)));
-        updateGlobalChecksum(sha256(packageName));
+        uint8_t* checksum = sha256(packageName);
+        updateGlobalChecksum(checksum);
+        delete [] checksum;
     }
 }

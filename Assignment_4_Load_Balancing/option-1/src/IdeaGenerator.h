@@ -13,7 +13,7 @@ class IdeaGenerator : public ChecksumTracker<IdeaGenerator, ChecksumType::IDEA>
     const int numPackages;
     const int numStudents;
 
-    std::string getNextIdea(int i);
+    // std::string getNextIdea(int i, Container<StrPair> ideas);
 
 public:
     IdeaGenerator(EventQueue* eq, int ideaStartIdx, int ideaEndIdx, int numPackages, int numStudents);

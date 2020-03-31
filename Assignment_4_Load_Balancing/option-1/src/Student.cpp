@@ -23,11 +23,11 @@ Student::~Student() {
     // nop
 }
 
-std::string Student::getIdeaChecksum() {
+uint8_t* Student::getIdeaChecksum() {
     return sha256(currentIdea->getName());
 }
 
-std::string Student::getPackagesChecksum() {
+uint8_t* Student::getPackagesChecksum() {
     // A really silly checksum that mainly serves to waste time to
     // make the Student thread seem like it's doing something besides
     // always waiting for a condition var
@@ -35,12 +35,13 @@ std::string Student::getPackagesChecksum() {
     // A checksum (in this simulation) is defined to be the xor of all
     // the sha256 hashes of the current project's packages
 
-    std::string checksum = initChecksum();
+    uint8_t* checksum = initChecksum();
 
     for (int i = 0; i < currentIdea->getNumPackagesReq(); i++) {
         std::string packageName = currentPackages[i]->getName();
-        std::string hash = sha256(packageName);
-        checksum = xorChecksum(checksum, hash);
+        uint8_t* hash = sha256(packageName);
+        xorChecksum(checksum, hash);
+        delete [] hash;
     }
 
     return checksum;
@@ -59,18 +60,18 @@ void Student::buildIdea() {
 
     // Present the idea
     {
-        std::string ideaChecksum = getIdeaChecksum();
+        uint8_t* ideaChecksum = getIdeaChecksum();
         ChecksumTracker<Student, ChecksumType::IDEA>::updateGlobalChecksum(ideaChecksum);
 
-        std::string packagesChecksum = getPackagesChecksum();
+        uint8_t* packagesChecksum = getPackagesChecksum();
         ChecksumTracker<Student, ChecksumType::PACKAGE>::updateGlobalChecksum(packagesChecksum);
 
         std::unique_lock<std::mutex> stdoutLock(eq->stdoutMutex);
 
         cout << endl;
         cout << "Student " << id << " built <" << currentIdea->getName() << "> (" << currentIdea->getNumPackagesReq() << " Packages)" << endl;
-        cout << "    ideaChecksum: " << ideaChecksum << endl;
-        cout << "packagesChecksum: " << packagesChecksum << endl;
+        cout << "    ideaChecksum: " <<  bytesToString(ideaChecksum, SHA256_DIGEST_LENGTH) << endl;
+        cout << "packagesChecksum: " << bytesToString(packagesChecksum, SHA256_DIGEST_LENGTH) << endl;
         for (int i = 0; i < currentIdea->getNumPackagesReq(); i++) {
             cout << "> " << currentPackages[i]->getName() << endl;
         }

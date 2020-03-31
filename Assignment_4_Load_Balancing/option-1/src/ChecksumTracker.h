@@ -3,6 +3,7 @@
 #include "utils.h"
 #include <string>
 #include <mutex>
+#include <openssl/sha.h>
 
 // https://en.wikipedia.org/wiki/Curiously_recurring_template_pattern
 
@@ -16,17 +17,17 @@ template <typename T, ChecksumType CT>
 class ChecksumTracker
 {
     static std::mutex checksumMutex[NUM_CHECKSUMS];
-    static std::string globalChecksum[NUM_CHECKSUMS];
+    static uint8_t* globalChecksum[NUM_CHECKSUMS];
 
 protected:
-    static void updateGlobalChecksum(std::string checksum) {
+    static void updateGlobalChecksum(uint8_t* checksum) {
         std::unique_lock<std::mutex> lock(checksumMutex[CT]);
 
-        if (globalChecksum[CT].empty()) {
+        if (globalChecksum[CT] == NULL) {
             globalChecksum[CT] = initChecksum();
         }
 
-        globalChecksum[CT] = xorChecksum(globalChecksum[CT], checksum);
+        xorChecksum(globalChecksum[CT], checksum);
     }
 
 public:
@@ -40,10 +41,10 @@ public:
 
     static std::string getGlobalChecksum() {
         std::unique_lock<std::mutex> lock(checksumMutex[CT]);
-        std::string checksum = globalChecksum[CT];
-        return checksum;
+        std::string result = bytesToString(globalChecksum[CT], SHA256_DIGEST_LENGTH);
+        return result;
     }
 };
 
 template <typename T, ChecksumType CT> std::mutex ChecksumTracker<T, CT>::checksumMutex[NUM_CHECKSUMS];
-template <typename T, ChecksumType CT> std::string ChecksumTracker<T, CT>::globalChecksum[NUM_CHECKSUMS];
+template <typename T, ChecksumType CT> uint8_t* ChecksumTracker<T, CT>::globalChecksum[NUM_CHECKSUMS];

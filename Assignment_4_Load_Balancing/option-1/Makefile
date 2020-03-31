@@ -96,7 +96,7 @@ FLAMEGRAPH_DIR := /opt-src/FlameGraph-master
 
 # -F 10000 (sampling rate in Hz)
 # -g (record call stack)
-PERF_FLAGS := -F 1000 -g
+PERF_FLAGS := -F 1000 -g --call-graph dwarf
 
 FLAMEGRAPH_RAW_FILE_$(1) := perf_$(1).data
 
